@@ -1,0 +1,8 @@
+[project]
+name = "piece-mobile"
+version = "1.0"
+requires-python = ">=3.9"
+
+[tool.flet]
+product = "计件登记"
+org = "com.shengyutong"
