@@ -1,8 +1,9 @@
 [project]
 name = "piece-mobile"
-version = "1.0"
+version = "1.0.0"
 requires-python = ">=3.9"
+dependencies = ["flet==0.24.1"]
 
 [tool.flet]
-product = "计件登记"
+product = "Piece Register"
 org = "com.shengyutong"
