@@ -9,6 +9,7 @@ DATA_DIR = os.getenv("FLET_APP_STORAGE_DATA", ".")
 DB_PATH = os.path.join(DATA_DIR, "piece_mobile.db")
 PRIMARY_COLOR = "#3B82F6"  # 截图中的蓝色主题
 BG_COLOR = "#F5F6F8"
+APP_TITLE = "盛煜通计件系统V6"
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
@@ -19,19 +20,16 @@ def init_db():
     conn = get_conn()
     try:
         c = conn.cursor()
-        # 员工表
         c.execute("""CREATE TABLE IF NOT EXISTS employee (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             group_name TEXT NOT NULL
         )""")
-        # 产品表 (型号+工序 = 产品名称)
         c.execute("""CREATE TABLE IF NOT EXISTS product (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             price REAL DEFAULT 0
         )""")
-        # 记账表
         c.execute("""CREATE TABLE IF NOT EXISTS record (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
@@ -164,7 +162,7 @@ def import_products_csv(filepath):
 
 # ==================== 主程序 ====================
 def main(page: ft.Page):
-    page.title = "计件记账"
+    page.title = APP_TITLE
     page.theme_mode = ft.ThemeMode.LIGHT
     page.bgcolor = BG_COLOR
     page.padding = 0
@@ -253,8 +251,12 @@ def main(page: ft.Page):
         return ft.View(
             route="/",
             controls=[
-                ft.AppBar(title=ft.Text("计件工资系统", color=ft.colors.BLACK), bgcolor=ft.colors.WHITE,
-                          center_title=False, actions=[ft.Icon(ft.icons.CLOUD_UPLOAD_OUTLINED, color=PRIMARY_COLOR)]),
+                ft.AppBar(
+                    title=ft.Text(APP_TITLE, color=ft.colors.BLACK, size=18, weight=ft.FontWeight.BOLD), 
+                    bgcolor=ft.colors.WHITE,
+                    center_title=True, 
+                    actions=[ft.Icon(ft.icons.CLOUD_UPLOAD_OUTLINED, color=PRIMARY_COLOR)]
+                ),
                 daily_list,
                 bottom_nav
             ],
@@ -303,7 +305,7 @@ def main(page: ft.Page):
             controls=[
                 ft.AppBar(
                     leading=ft.IconButton(ft.icons.CLOSE, on_click=go_back),
-                    title=ft.Text("选择产品", color=ft.colors.WHITE),
+                    title=ft.Text(APP_TITLE, color=ft.colors.WHITE, size=18, weight=ft.FontWeight.BOLD),
                     bgcolor=PRIMARY_COLOR, center_title=True,
                     actions=[ft.TextButton("取消", on_click=go_back, style=ft.ButtonStyle(color=ft.colors.WHITE))]
                 ),
@@ -347,7 +349,8 @@ def main(page: ft.Page):
             controls=[
                 ft.AppBar(
                     leading=ft.IconButton(ft.icons.ARROW_BACK, on_click=go_back, icon_color=ft.colors.BLACK),
-                    title=ft.Text("产品设置", color=ft.colors.BLACK), bgcolor=ft.colors.WHITE, center_title=True,
+                    title=ft.Text(APP_TITLE, color=ft.colors.BLACK, size=18, weight=ft.FontWeight.BOLD), 
+                    bgcolor=ft.colors.WHITE, center_title=True,
                     actions=[ft.TextButton("排序")]
                 ),
                 ft.Container(content=search_field, padding=10, bgcolor=ft.colors.WHITE),
@@ -396,11 +399,12 @@ def main(page: ft.Page):
             controls=[
                 ft.AppBar(
                     leading=ft.IconButton(ft.icons.ARROW_BACK, on_click=go_back, icon_color=ft.colors.BLACK),
-                    title=ft.Text("添加产品" if not p_id else "编辑产品", color=ft.colors.BLACK), 
+                    title=ft.Text(APP_TITLE, color=ft.colors.BLACK, size=18, weight=ft.FontWeight.BOLD), 
                     bgcolor=ft.colors.WHITE, center_title=True
                 ),
                 ft.Container(
                     content=ft.Column([
+                        ft.Text("添加产品" if not p_id else "编辑产品", size=12, color=ft.colors.GREY, margin=ft.margin.only(bottom=10)),
                         name_field,
                         ft.Divider(height=1),
                         price_field,
@@ -476,7 +480,8 @@ def main(page: ft.Page):
             controls=[
                 ft.AppBar(
                     leading=ft.IconButton(ft.icons.CLOSE, on_click=go_back, icon_color=ft.colors.WHITE),
-                    title=ft.Text(f"{state['current_date']}", color=ft.colors.WHITE), bgcolor=PRIMARY_COLOR, center_title=True,
+                    title=ft.Text(APP_TITLE, color=ft.colors.WHITE, size=18, weight=ft.FontWeight.BOLD), 
+                    bgcolor=PRIMARY_COLOR, center_title=True,
                     actions=[ft.TextButton("保存", on_click=do_save, style=ft.ButtonStyle(color=ft.colors.WHITE))]
                 ),
                 ft.Container(
@@ -511,7 +516,6 @@ def main(page: ft.Page):
 
         tab_state = {"current": "summary"}
         
-        # 顶部搜索框 (方案一)
         emp_search = ft.TextField(
             hint_text="输入员工姓名查找明细...", 
             prefix_icon=ft.icons.SEARCH, 
@@ -536,7 +540,6 @@ def main(page: ft.Page):
             total_text.value = f"{total[1]:.2f}" if total[1] else "0.00"
             page.update()
 
-        # 加载汇总页 (方案二：点击跳转)
         def load_summary():
             summary_list.controls.clear()
             rows = get_employee_summary(state["current_month"])
@@ -569,7 +572,6 @@ def main(page: ft.Page):
             emp_search.value = emp_name
             load_details()
 
-        # 加载明细页 (带搜索和左滑)
         def load_details():
             detail_list.controls.clear()
             kw = emp_search.value.strip()
@@ -589,7 +591,6 @@ def main(page: ft.Page):
                 page.update()
                 return
 
-            # 模糊匹配到多人
             if len(emp_names) > 1 or emp_names[0] != kw:
                 detail_list.controls.append(ft.Text("请选择员工：", size=14, color=ft.colors.GREY, margin=ft.margin.only(left=15, bottom=5)))
                 for name in emp_names:
@@ -606,7 +607,6 @@ def main(page: ft.Page):
                 page.update()
                 return
 
-            # 精确匹配单人
             selected_emp = emp_names[0]
             records = get_employee_details(state["current_month"], selected_emp)
             
@@ -754,7 +754,8 @@ def main(page: ft.Page):
             controls=[
                 ft.AppBar(
                     leading=ft.IconButton(ft.icons.ARROW_BACK, on_click=go_back, icon_color=ft.colors.BLACK),
-                    title=ft.Text(f"{state['current_month']} 统计", color=ft.colors.BLACK), bgcolor=ft.colors.WHITE, center_title=True,
+                    title=ft.Text(APP_TITLE, color=ft.colors.BLACK, size=18, weight=ft.FontWeight.BOLD),
+                    bgcolor=ft.colors.WHITE, center_title=True,
                     actions=[
                         ft.IconButton(ft.icons.FILE_DOWNLOAD, tooltip="导出本月明细", on_click=do_export_records),
                         ft.IconButton(ft.icons.INVENTORY, tooltip="导出产品库", on_click=do_export_products),
