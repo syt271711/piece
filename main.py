@@ -396,32 +396,61 @@ def main(page: ft.Page):
         amount_text.value = "金额：0.00"
         page.update()
 
-    # ---------- 弹窗 ----------
-    def close_dialog(dlg): dlg.open = False; page.update()
-    def open_dialog(dlg): page.dialog = dlg; dlg.open = True; page.update()
+    # ---------- 底部弹窗（BottomSheet）通用控制 ----------
+    def open_bottom_sheet(sheet):
+        # 先关闭可能存在的搜索列表，防止层级遮挡和焦点冲突
+        emp_list.visible = False
+        model_list.visible = False
+        page.update()
+        
+        page.bottom_sheet = sheet
+        page.bottom_sheet.open = True
+        page.update()
 
-    # 新增员工
-    new_emp_name = ft.TextField(label="姓名", width=250)
-    new_emp_group = ft.TextField(label="班组", width=250)
+    def close_bottom_sheet(sheet):
+        sheet.open = False
+        page.update()
+
+    # ====== 新增员工 (BottomSheet) ======
+    new_emp_name = ft.TextField(label="姓名", width=300, border_radius=8)
+    new_emp_group = ft.TextField(label="班组", width=300, border_radius=8)
+    
     def do_add_employee(e):
         name = new_emp_name.value.strip()
         group = new_emp_group.value.strip()
         if name and group:
             add_employee(name, group)
             new_emp_name.value = ""; new_emp_group.value = ""
-            dlg_emp.open = False
-            # 回填到表单
+            
             emp_field.value = name
             state["group"] = group
             emp_group_text.value = f"班组: {group}"
+            emp_list.visible = False
+            
             status_text.value = f"员工 [{name}] 已新增"
             status_text.color = ft.colors.GREEN
-            page.update()
-    dlg_emp = ft.AlertDialog(title=ft.Text("新增员工"), content=ft.Column([new_emp_name, new_emp_group], tight=True),
-        actions=[ft.TextButton("取消", on_click=lambda e: close_dialog(dlg_emp)), ft.TextButton("保存", on_click=do_add_employee)])
+            
+            close_bottom_sheet(bs_emp)
+    
+    bs_emp = ft.BottomSheet(
+        ft.Container(
+            content=ft.Column([
+                ft.Text("新增员工", size=18, weight=ft.FontWeight.BOLD),
+                new_emp_name,
+                new_emp_group,
+                ft.Row([
+                    ft.TextButton("取消", on_click=lambda e: close_bottom_sheet(bs_emp)),
+                    ft.ElevatedButton("保存", on_click=do_add_employee),
+                ], alignment=ft.MainAxisAlignment.END)
+            ], tight=True),
+            padding=20,
+        ),
+        open=False,
+    )
 
-    # 新增型号
-    new_m_model = ft.TextField(label="产品型号", width=250)
+    # ====== 新增型号 (BottomSheet) ======
+    new_m_model = ft.TextField(label="产品型号", width=300, border_radius=8)
+    
     def do_add_model(e):
         model = new_m_model.value.strip()
         if model:
@@ -433,20 +462,35 @@ def main(page: ft.Page):
                 add_model(model)
                 status_text.value = f"型号 [{model}] 已新增"
                 status_text.color = ft.colors.GREEN
+            
             new_m_model.value = ""
-            dlg_model.open = False
-            # 回填
             model_field.value = model
             state["model"] = model
+            model_list.visible = False
             on_model_selected(model)
-            page.update()
-    dlg_model = ft.AlertDialog(title=ft.Text("新增产品型号"), content=ft.Column([new_m_model], tight=True),
-        actions=[ft.TextButton("取消", on_click=lambda e: close_dialog(dlg_model)), ft.TextButton("保存", on_click=do_add_model)])
+            
+            close_bottom_sheet(bs_model)
 
-    # 新增工序
-    new_p_model = ft.TextField(label="产品型号", width=250)
-    new_p_name = ft.TextField(label="工序名称", width=250)
-    new_p_price = ft.TextField(label="单价", value="0", width=250, keyboard_type=ft.KeyboardType.NUMBER)
+    bs_model = ft.BottomSheet(
+        ft.Container(
+            content=ft.Column([
+                ft.Text("新增产品型号", size=18, weight=ft.FontWeight.BOLD),
+                new_m_model,
+                ft.Row([
+                    ft.TextButton("取消", on_click=lambda e: close_bottom_sheet(bs_model)),
+                    ft.ElevatedButton("保存", on_click=do_add_model),
+                ], alignment=ft.MainAxisAlignment.END)
+            ], tight=True),
+            padding=20,
+        ),
+        open=False,
+    )
+
+    # ====== 新增工序 (BottomSheet) ======
+    new_p_model = ft.TextField(label="产品型号", width=300, border_radius=8)
+    new_p_name = ft.TextField(label="工序名称", width=300, border_radius=8)
+    new_p_price = ft.TextField(label="单价", value="0", width=300, keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
+    
     def do_add_process(e):
         model = new_p_model.value.strip()
         pname = new_p_name.value.strip()
@@ -455,8 +499,7 @@ def main(page: ft.Page):
         if model and pname:
             add_process(model, pname, price)
             new_p_model.value = ""; new_p_name.value = ""; new_p_price.value = "0"
-            dlg_proc.open = False
-            # 若型号与当前一致则刷新工序下拉
+            
             if state["model"] == model:
                 on_model_selected(model)
                 process_dropdown.value = pname
@@ -464,14 +507,29 @@ def main(page: ft.Page):
                 calc_amount()
             status_text.value = f"工序 [{model} / {pname}] 已新增"
             status_text.color = ft.colors.GREEN
-            page.update()
-    dlg_proc = ft.AlertDialog(title=ft.Text("新增工序"), content=ft.Column([new_p_model, new_p_name, new_p_price], tight=True),
-        actions=[ft.TextButton("取消", on_click=lambda e: close_dialog(dlg_proc)), ft.TextButton("保存", on_click=do_add_process)])
+            
+            close_bottom_sheet(bs_proc)
 
-    # 打开新增工序时自动带入当前型号
+    bs_proc = ft.BottomSheet(
+        ft.Container(
+            content=ft.Column([
+                ft.Text("新增工序", size=18, weight=ft.FontWeight.BOLD),
+                new_p_model,
+                new_p_name,
+                new_p_price,
+                ft.Row([
+                    ft.TextButton("取消", on_click=lambda e: close_bottom_sheet(bs_proc)),
+                    ft.ElevatedButton("保存", on_click=do_add_process),
+                ], alignment=ft.MainAxisAlignment.END)
+            ], tight=True),
+            padding=20,
+        ),
+        open=False,
+    )
+
     def open_add_process(e):
         new_p_model.value = state["model"] or model_field.value.strip()
-        open_dialog(dlg_proc)
+        open_bottom_sheet(bs_proc)
 
     # ---------- 导入 / 导出 ----------
     def pick_and_import(import_func, label):
@@ -521,10 +579,10 @@ def main(page: ft.Page):
             ], alignment=ft.MainAxisAlignment.SPACE_AROUND),
             status_text,
             ft.Divider(height=1),
-            ft.Row([emp_field, ft.IconButton(icon=ft.icons.PERSON_ADD, icon_color=PRIMARY_COLOR, on_click=lambda e: open_dialog(dlg_emp))]),
+            ft.Row([emp_field, ft.IconButton(icon=ft.icons.PERSON_ADD, icon_color=PRIMARY_COLOR, on_click=lambda e: open_bottom_sheet(bs_emp))]),
             emp_group_text,
             emp_list,
-            ft.Row([model_field, ft.IconButton(icon=ft.icons.ADD_BOX, icon_color=PRIMARY_COLOR, on_click=lambda e: open_dialog(dlg_model))]),
+            ft.Row([model_field, ft.IconButton(icon=ft.icons.ADD_BOX, icon_color=PRIMARY_COLOR, on_click=lambda e: open_bottom_sheet(bs_model))]),
             model_list,
             ft.Row([process_dropdown, ft.IconButton(icon=ft.icons.PLAYLIST_ADD, icon_color=PRIMARY_COLOR, on_click=open_add_process)]),
             price_field,
@@ -568,7 +626,7 @@ def main(page: ft.Page):
     detail_emp_dd = ft.Dropdown(label="选择员工查看明细", width=300, border_radius=8, bgcolor=ft.colors.WHITE)
     detail_list = ft.ListView(spacing=10, padding=10, expand=True)
 
-    # 修改明细弹窗控件
+    # 修改明细弹窗控件 (保留 Dialog 形式)
     edit_id_state = {"id": None}
     edit_date = ft.TextField(label="日期 (YYYY-MM-DD)", width=250)
     edit_model = ft.TextField(label="产品型号", width=250)
@@ -752,6 +810,12 @@ def main(page: ft.Page):
         expand=1,
     )
     page.add(tabs)
+
+    # 保留用于明细修改的 Dialog 控制函数
+    def close_dialog(dlg): 
+        dlg.open = False; page.update()
+    def open_dialog(dlg): 
+        page.dialog = dlg; dlg.open = True; page.update()
 
     init_db()
     refresh_stat()
