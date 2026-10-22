@@ -2,8 +2,4 @@
 name = "piece-mobile"
 version = "1.0.0"
 requires-python = ">=3.9"
-dependencies = ["flet==0.28.3", "pip"]
-
-[tool.flet]
-product = "Piece Register"
-org = "com.shengyutong"
+dependencies = ["flet==0.24.1"]
