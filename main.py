@@ -7,7 +7,7 @@ from datetime import datetime
 # ========== 配置与数据库 ==========
 DATA_DIR = os.getenv("FLET_APP_STORAGE_DATA", ".")
 DB_PATH = os.path.join(DATA_DIR, "piece_mobile.db")
-PRIMARY_COLOR = "#3B82F6"  # 截图中的蓝色主题
+PRIMARY_COLOR = "#3B82F6"
 BG_COLOR = "#F5F6F8"
 APP_TITLE = "盛煜通计件系统V6"
 
@@ -43,6 +43,21 @@ def init_db():
     finally:
         conn.close()
 
+# ---------- 数据操作：员工 ----------
+def get_employees():
+    conn = get_conn()
+    rows = conn.execute("SELECT id, name, group_name FROM employee ORDER BY id DESC").fetchall()
+    conn.close()
+    return rows
+
+def add_employee(name, group):
+    conn = get_conn()
+    try:
+        conn.execute("INSERT OR IGNORE INTO employee(name, group_name) VALUES(?,?)", (name, group))
+        conn.commit()
+    finally:
+        conn.close()
+
 # ---------- 数据操作：产品 ----------
 def get_products(keyword=""):
     conn = get_conn()
@@ -66,7 +81,7 @@ def update_product(p_id, name, price):
     finally:
         conn.close()
 
-# ---------- 数据操作：记账流水 ----------
+# ---------- 数据操作：流水与统计 ----------
 def save_record(date, emp, product, price, qty):
     amount = price * qty
     conn = get_conn()
@@ -84,7 +99,6 @@ def get_daily_summary():
     conn.close()
     return rows
 
-# ---------- 数据操作：统计与明细 ----------
 def get_employee_summary(year_month):
     conn = get_conn()
     rows = conn.execute(
@@ -138,6 +152,25 @@ def export_csv_to_dir(filename_prefix, headers, data_generator):
     except Exception as e:
         return False, f"导出失败: {e}"
 
+def import_employees_csv(filepath):
+    conn = get_conn()
+    count = 0
+    try:
+        with open(filepath, newline="", encoding="utf-8-sig") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) < 2: continue
+                name, group = row[0].strip(), row[1].strip()
+                if not name or name == "姓名": continue
+                conn.execute("INSERT OR IGNORE INTO employee(name, group_name) VALUES(?,?)", (name, group))
+                count += 1
+        conn.commit()
+        return True, f"成功导入 {count} 名员工"
+    except Exception as e:
+        return False, f"导入失败: {e}"
+    finally:
+        conn.close()
+
 def import_products_csv(filepath):
     conn = get_conn()
     count = 0
@@ -169,12 +202,13 @@ def main(page: ft.Page):
     
     state = {
         "current_date": datetime.now().strftime("%Y-%m-%d"),
-        "current_emp": "默认员工", 
+        "current_emp": "未登录", 
         "current_month": datetime.now().strftime("%Y-%m")
     }
 
-    file_picker = ft.FilePicker()
-    page.overlay.append(file_picker)
+    file_picker_emp = ft.FilePicker()
+    file_picker_prod = ft.FilePicker()
+    page.overlay.extend([file_picker_emp, file_picker_prod])
 
     def snack(msg):
         page.snack_bar = ft.SnackBar(ft.Text(msg), duration=3000)
@@ -190,7 +224,64 @@ def main(page: ft.Page):
         page.views.append(view)
         page.update()
 
-    # ==================== 页面 1：首页 (图1) ====================
+    # ==================== 页面：员工管理 ====================
+    def view_employee_manage():
+        emp_list = ft.ListView(spacing=1, expand=True)
+        
+        def load_list():
+            emp_list.controls.clear()
+            for e_id, name, group in get_employees():
+                def select_emp(n):
+                    state["current_emp"] = n
+                    snack(f"已切换为当前操作员工：{n}")
+                    go_back()
+                    # 重新渲染首页更新底部文字
+                    page.views[0] = view_home()
+                    page.update()
+
+                emp_list.controls.append(
+                    ft.Container(
+                        content=ft.ListTile(
+                            title=ft.Text(name, size=16, weight=ft.FontWeight.BOLD),
+                            subtitle=ft.Text(f"班组: {group}", size=12),
+                            trailing=ft.IconButton(ft.icons.CHECK_CIRCLE, icon_color=PRIMARY_COLOR, tooltip="设为当前员工", on_click=lambda e, n=name: select_emp(n))
+                        ),
+                        bgcolor=ft.colors.WHITE, border=ft.border.only(bottom=ft.border.BorderSide(1, ft.colors.GREY_200))
+                    )
+                )
+            page.update()
+
+        def do_import(e: ft.FilePickerResultEvent):
+            if not e.files: return
+            success, msg = import_employees_csv(e.files[0].path)
+            snack(msg)
+            if success: load_list()
+
+        file_picker_emp.on_result = do_import
+        load_list()
+
+        return ft.View(
+            route="/employees",
+            controls=[
+                ft.AppBar(
+                    leading=ft.IconButton(ft.icons.ARROW_BACK, on_click=go_back, icon_color=ft.colors.BLACK),
+                    title=ft.Text(APP_TITLE, color=ft.colors.BLACK, size=18, weight=ft.FontWeight.BOLD),
+                    bgcolor=ft.colors.WHITE, center_title=True
+                ),
+                ft.Container(
+                    content=ft.Text("点击右侧图标，选中你要操作的员工。", size=12, color=ft.colors.GREY),
+                    padding=15, bgcolor=ft.colors.WHITE, border=ft.border.only(bottom=ft.border.BorderSide(1, ft.colors.GREY_200))
+                ),
+                emp_list,
+                ft.Container(
+                    content=ft.TextButton("批量导入员工 (CSV格式: 姓名,班组)", icon=ft.icons.UPLOAD_FILE, on_click=lambda _: file_picker_emp.pick_files(allowed_extensions=["csv"])),
+                    alignment=ft.alignment.center, bgcolor=ft.colors.WHITE, height=60
+                )
+            ],
+            padding=0
+        )
+
+    # ==================== 页面 1：首页 ====================
     def view_home():
         daily_list = ft.ListView(spacing=0, expand=True)
         summaries = get_daily_summary()
@@ -241,8 +332,11 @@ def main(page: ft.Page):
                     alignment=ft.alignment.center, margin=ft.margin.only(top=-20),
                     on_click=lambda _: switch_page(view_select_product())
                 ),
-                ft.Column([ft.Icon(ft.icons.PERSON_OUTLINE, color=ft.colors.GREY), ft.Text("未登录", size=12, color=ft.colors.GREY)],
-                          alignment=ft.MainAxisAlignment.CENTER)
+                # 底部导航：动态显示当前员工
+                ft.Column([
+                    ft.Icon(ft.icons.PERSON_OUTLINE, color=PRIMARY_COLOR if state["current_emp"] != "未登录" else ft.colors.GREY), 
+                    ft.Text(state["current_emp"], size=12, color=PRIMARY_COLOR if state["current_emp"] != "未登录" else ft.colors.GREY)
+                ], alignment=ft.MainAxisAlignment.CENTER, on_click=lambda _: switch_page(view_employee_manage()))
             ], alignment=ft.MainAxisAlignment.SPACE_AROUND),
             padding=10, bgcolor=ft.colors.WHITE, height=70,
             shadow=ft.BoxShadow(blur_radius=10, color=ft.colors.BLACK12)
@@ -253,8 +347,7 @@ def main(page: ft.Page):
             controls=[
                 ft.AppBar(
                     title=ft.Text(APP_TITLE, color=ft.colors.BLACK, size=18, weight=ft.FontWeight.BOLD), 
-                    bgcolor=ft.colors.WHITE,
-                    center_title=True, 
+                    bgcolor=ft.colors.WHITE, center_title=True, 
                     actions=[ft.Icon(ft.icons.CLOUD_UPLOAD_OUTLINED, color=PRIMARY_COLOR)]
                 ),
                 daily_list,
@@ -263,7 +356,7 @@ def main(page: ft.Page):
             padding=0
         )
 
-    # ==================== 页面 2：选择产品 (图2) ====================
+    # ==================== 页面 2：选择产品 ====================
     def view_select_product():
         search_input = ft.TextField(hint_text="搜索", border_radius=20, bgcolor="#F0F0F0", border_width=0, height=45, prefix_icon=ft.icons.SEARCH)
         product_list = ft.ListView(spacing=5, padding=10, expand=True)
@@ -274,6 +367,11 @@ def main(page: ft.Page):
             for p_id, name, price in rows:
                 def make_click(n, p):
                     def click(ev):
+                        # 校验是否已选员工
+                        if state["current_emp"] == "未登录":
+                            snack("请先在首页底部选择【当前员工】！")
+                            switch_page(view_employee_manage())
+                            return
                         switch_page(view_input_qty(n, p))
                     return click
                 product_list.controls.append(
@@ -316,7 +414,7 @@ def main(page: ft.Page):
             padding=0
         )
 
-    # ==================== 页面 3：产品设置 (图3) ====================
+    # ==================== 页面 3：产品设置 ====================
     def view_product_settings():
         product_list = ft.ListView(spacing=1, expand=True)
         search_field = ft.TextField(hint_text="搜索", prefix_icon=ft.icons.SEARCH, border_radius=20, bgcolor="#F0F0F0", border_width=0, height=40)
@@ -363,7 +461,7 @@ def main(page: ft.Page):
             padding=0
         )
 
-    # ==================== 页面 4：添加产品 (图4) ====================
+    # ==================== 页面 4：添加产品 ====================
     def view_add_product(p_id=None, old_name="", old_price=""):
         name_field = ft.TextField(label="产品名称", value=old_name, hint_text="请输入产品或工序名", border_width=0)
         price_field = ft.TextField(label="单价(元)", value=str(old_price) if old_price else "", hint_text="请输入金额", border_width=0, keyboard_type=ft.KeyboardType.NUMBER)
@@ -392,7 +490,7 @@ def main(page: ft.Page):
             if success:
                 go_back()
 
-        file_picker.on_result = do_import
+        file_picker_prod.on_result = do_import
 
         return ft.View(
             route="/add_product",
@@ -420,14 +518,14 @@ def main(page: ft.Page):
                     alignment=ft.alignment.center, margin=20
                 ),
                 ft.Container(
-                    content=ft.TextButton("批量导入产品 (CSV格式: 产品名称,单价)", icon=ft.icons.UPLOAD_FILE, on_click=lambda _: file_picker.pick_files(allowed_extensions=["csv"])),
+                    content=ft.TextButton("批量导入产品 (CSV格式: 产品名称,单价)", icon=ft.icons.UPLOAD_FILE, on_click=lambda _: file_picker_prod.pick_files(allowed_extensions=["csv"])),
                     alignment=ft.alignment.center
                 )
             ],
             padding=0
         )
 
-    # ==================== 页面 5：输入数量 (图5) ====================
+    # ==================== 页面 5：输入数量 ====================
     def view_input_qty(product_name, price):
         qty_text = ft.Text("0", size=60, color=PRIMARY_COLOR, weight=ft.FontWeight.BOLD)
         qty_value = {"val": "0"}
@@ -486,7 +584,10 @@ def main(page: ft.Page):
                 ),
                 ft.Container(
                     content=ft.Row([
-                        ft.Text(product_name, size=18, expand=True),
+                        ft.Column([
+                            ft.Text(f"当前员工: {state['current_emp']}", size=12, color=PRIMARY_COLOR),
+                            ft.Text(product_name, size=18, weight=ft.FontWeight.BOLD)
+                        ], expand=True),
                         qty_text,
                         ft.Text("数量", color=ft.colors.GREY)
                     ]),
@@ -514,22 +615,14 @@ def main(page: ft.Page):
         summary_list = ft.ListView(spacing=1, expand=True)
         detail_list = ft.ListView(spacing=1, expand=True, visible=False)
 
-        tab_state = {"current": "summary"}
-        
         emp_search = ft.TextField(
-            hint_text="输入员工姓名查找明细...", 
-            prefix_icon=ft.icons.SEARCH, 
-            border_radius=20, 
-            bgcolor="#F0F0F0", 
-            border_width=0, 
-            height=40,
+            hint_text="输入员工姓名查找明细...", prefix_icon=ft.icons.SEARCH, 
+            border_radius=20, bgcolor="#F0F0F0", border_width=0, height=40,
             on_change=lambda e: load_details()
         )
         search_container = ft.Container(
-            content=emp_search, 
-            padding=ft.padding.only(left=15, right=15, top=10, bottom=10), 
-            bgcolor=ft.colors.WHITE, 
-            visible=False
+            content=emp_search, padding=ft.padding.only(left=15, right=15, top=10, bottom=10), 
+            bgcolor=ft.colors.WHITE, visible=False
         )
 
         def load_total():
@@ -694,7 +787,6 @@ def main(page: ft.Page):
             page.update()
 
         def switch_tab(tab):
-            tab_state["current"] = tab
             if tab == "summary":
                 btn_summary.bgcolor = PRIMARY_COLOR
                 btn_summary.content.color = ft.colors.WHITE
@@ -741,7 +833,7 @@ def main(page: ft.Page):
             content=ft.Row([
                 ft.Column([ft.Icon(ft.icons.INSERT_CHART, color=PRIMARY_COLOR), ft.Text("统计", size=12, color=PRIMARY_COLOR)], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Container(content=ft.Icon(ft.icons.ADD, color=ft.colors.WHITE, size=36), bgcolor=PRIMARY_COLOR, width=60, height=60, border_radius=30, alignment=ft.alignment.center, margin=ft.margin.only(top=-20), on_click=lambda _: switch_page(view_select_product())),
-                ft.Column([ft.Icon(ft.icons.PERSON_OUTLINE, color=ft.colors.GREY), ft.Text("未登录", size=12, color=ft.colors.GREY)], alignment=ft.MainAxisAlignment.CENTER, on_click=go_back)
+                ft.Column([ft.Icon(ft.icons.PERSON_OUTLINE, color=ft.colors.GREY), ft.Text(state["current_emp"], size=12, color=ft.colors.GREY)], alignment=ft.MainAxisAlignment.CENTER, on_click=go_back)
             ], alignment=ft.MainAxisAlignment.SPACE_AROUND),
             padding=10, bgcolor=ft.colors.WHITE, height=70, shadow=ft.BoxShadow(blur_radius=10, color=ft.colors.BLACK12)
         )
