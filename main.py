@@ -219,11 +219,14 @@ def get_details(year, month, employee_name):
 
 
 def main(page: ft.Page):
-    # ==================== 页面基础设置 ====================
     page.title = "盛煜通计件工资系统"
     page.padding = 0
     page.bgcolor = "#F4F6F8"
     page.theme_mode = ft.ThemeMode.LIGHT
+
+    # ===== 验证用红字，确认 Pyodide 是否启动 =====
+    page.add(ft.Text("PY-OK", color="red", size=30))
+    page.update()
 
     PRIMARY_COLOR = "#2E7D32"
     page.theme = ft.Theme(
@@ -649,11 +652,9 @@ def main(page: ft.Page):
         sheet.open = False
         page.update()
 
-    page.overlay.append(bs_emp)
-    page.overlay.append(bs_model)
-    page.overlay.append(bs_proc)
+    # ===== 已删除：page.overlay.append(bs_emp/bs_model/bs_proc) =====
 
-    # ==================== 导入 / 导出 ====================
+    # ==================== 导入 / 导出（改回 save_file） ====================
     def pick_and_import(import_func, label):
         def on_result(e: ft.FilePickerResultEvent):
             if not e.files: return
@@ -674,30 +675,16 @@ def main(page: ft.Page):
             if not e.path:
                 return
             try:
-                full_path = os.path.join(e.path, default_name)
-                if os.path.exists(full_path):
-                    base, ext = os.path.splitext(default_name)
-                    full_path = os.path.join(
-                        e.path, f"{base}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-                    )
-                n = export_func(full_path)
+                n = export_func(e.path)
                 status_text.value = f"{label}导出成功，共 {n} 条"
                 status_text.color = ft.colors.GREEN
-                page.update()
-                page.snack_bar = ft.SnackBar(ft.Text(f"{label}已导出到: {full_path}"))
-                page.snack_bar.open = True
                 page.update()
             except Exception as ex:
                 status_text.value = f"导出失败：{ex}"
                 status_text.color = ft.colors.RED
                 page.update()
         save_picker.on_result = on_result
-        try:
-            save_picker.get_directory_path(dialog_title=f"选择保存目录 - {label}")
-        except Exception as ex:
-            status_text.value = f"打开保存对话框失败：{ex}"
-            status_text.color = ft.colors.RED
-            page.update()
+        save_picker.save_file(file_name=default_name, allowed_extensions=["csv"])
 
     def export_models(e):
         do_export(lambda p: export_models_csv(p), "产品型号.csv", "产品型号")
@@ -744,7 +731,7 @@ def main(page: ft.Page):
         wizard_card,
     ], scroll=ft.ScrollMode.AUTO)
 
-    # ==================== 统计页（汇总卡片） ====================
+    # ==================== 统计页 ====================
     current_year = str(datetime.now().year)
     current_month = str(datetime.now().month)
 
@@ -758,12 +745,10 @@ def main(page: ft.Page):
     stat_list = ft.ListView(spacing=10, padding=10, expand=True)
     stat_total = ft.Text("合计：0.00 元 / 0 件", size=16, weight=ft.FontWeight.BOLD, color=PRIMARY_COLOR)
 
-    # 明细页控件（提前定义，供汇总卡片跳转使用）
     detail_emp_dd = ft.Dropdown(label="选择员工查看明细", width=300, border_radius=8, bgcolor=ft.colors.WHITE)
     detail_list = ft.ListView(spacing=8, padding=10, expand=True)
 
     def open_employee_detail(emp_name):
-        # 设置明细页员工并切换
         detail_emp_dd.value = emp_name
         load_detail()
         tabs.selected_index = 2
@@ -847,7 +832,6 @@ def main(page: ft.Page):
     ], expand=True)
 
     # ==================== 明细页（左滑编辑/删除） ====================
-    # 编辑弹窗
     edit_id_state = {"id": None}
     edit_date = ft.TextField(label="日期 (YYYY-MM-DD)", width=250)
     edit_model = ft.TextField(label="产品型号", width=250)
@@ -908,7 +892,6 @@ def main(page: ft.Page):
         edit_qty.value = f"{qty or 0}"
         open_dialog(dlg_edit)
 
-    # 删除确认
     delete_id_state = {"id": None}
 
     def confirm_delete(rec_id):
@@ -936,11 +919,9 @@ def main(page: ft.Page):
         )
         open_dialog(dlg_del)
 
-    # ---------- 左滑卡片构建 ----------
-    ACTION_WIDTH = 140  # 两个按钮总宽
+    ACTION_WIDTH = 140
 
     def make_swipe_row(rec_id, date, model, qty, pname, price, amt):
-        # 内容层
         content = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -964,7 +945,6 @@ def main(page: ft.Page):
             shadow=ft.BoxShadow(blur_radius=4, color=ft.colors.BLACK12),
         )
 
-        # 右侧操作按钮层（固定在卡片下方，内容左移后露出）
         actions = ft.Container(
             content=ft.Row([
                 ft.Container(
@@ -994,12 +974,7 @@ def main(page: ft.Page):
             alignment=ft.alignment.center_right,
         )
 
-        # 用 Stack 叠放：底层是 actions，上层是 content
-        # 通过 content 的 left 偏移实现滑出
-        # Flet 没有直接 left 动画，用 container 的 offset 实现
         content_holder = ft.Container(content=content, offset=ft.transform.Offset(0, 0))
-
-        # 拖动状态
         drag_state = {"start_x": 0, "current": 0.0, "opened": False}
 
         def on_pan_start(e):
@@ -1008,17 +983,15 @@ def main(page: ft.Page):
         def on_pan_update(e):
             dx = e.local_delta.x if hasattr(e, "local_delta") and e.local_delta else 0
             new_x = drag_state["start_x"] + dx
-            # 限制范围 [-ACTION_WIDTH, 0]
             if new_x > 0:
                 new_x = 0
             if new_x < -ACTION_WIDTH:
                 new_x = -ACTION_WIDTH
             drag_state["current"] = new_x
             content_holder.offset = ft.transform.Offset(new_x / 100.0, 0)
-            page.update()
+            # 已删除：每帧 page.update()，避免 Web 端高频刷新拖死主线程
 
         def on_pan_end(e):
-            # 松手后吸附：超过一半就打开，否则回弹
             if drag_state["current"] < -ACTION_WIDTH / 2:
                 drag_state["current"] = -ACTION_WIDTH
                 drag_state["opened"] = True
