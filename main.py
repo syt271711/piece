@@ -224,8 +224,12 @@ def main(page: ft.Page):
     page.bgcolor = "#F4F6F8"
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # ===== 验证用红字，确认 Pyodide 是否启动 =====
+    # ===== 先初始化数据库，再添加任何界面 =====
+    init_db()
+
+    # ===== 诊断：红字 + 蓝色DB路径 + 绿色TABS占位 =====
     page.add(ft.Text("PY-OK", color="red", size=30))
+    page.add(ft.Text(f"DB: {DB_PATH}", color="blue", size=12))
     page.update()
 
     PRIMARY_COLOR = "#2E7D32"
@@ -652,9 +656,7 @@ def main(page: ft.Page):
         sheet.open = False
         page.update()
 
-    # ===== 已删除：page.overlay.append(bs_emp/bs_model/bs_proc) =====
-
-    # ==================== 导入 / 导出（改回 save_file） ====================
+    # ==================== 导入 / 导出 ====================
     def pick_and_import(import_func, label):
         def on_result(e: ft.FilePickerResultEvent):
             if not e.files: return
@@ -831,7 +833,7 @@ def main(page: ft.Page):
         stat_list,
     ], expand=True)
 
-    # ==================== 明细页（左滑编辑/删除） ====================
+    # ==================== 明细页 ====================
     edit_id_state = {"id": None}
     edit_date = ft.TextField(label="日期 (YYYY-MM-DD)", width=250)
     edit_model = ft.TextField(label="产品型号", width=250)
@@ -989,7 +991,6 @@ def main(page: ft.Page):
                 new_x = -ACTION_WIDTH
             drag_state["current"] = new_x
             content_holder.offset = ft.transform.Offset(new_x / 100.0, 0)
-            # 已删除：每帧 page.update()，避免 Web 端高频刷新拖死主线程
 
         def on_pan_end(e):
             if drag_state["current"] < -ACTION_WIDTH / 2:
@@ -1090,9 +1091,12 @@ def main(page: ft.Page):
         ],
         expand=1,
     )
-    page.add(tabs)
 
-    init_db()
+    # 绿色 TABS 占位验证
+    page.add(ft.Text("TABS-OK", color="green", size=20))
+    page.update()
+
+    page.add(tabs)
     refresh_step_indicator()
     refresh_stat()
 
