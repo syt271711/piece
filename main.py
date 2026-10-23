@@ -279,8 +279,8 @@ async def main(page: ft.Page):
                 ),
                 emp_list,
                 ft.Container(
-                    content=ft.Button("批量导入员工 (CSV: 姓名,班组)", icon=ft.Icons.UPLOAD_FILE,
-                                      on_click=do_import),
+                    content=ft.Button(content=ft.Text("批量导入员工 (CSV: 姓名,班组)"),
+                                      icon=ft.Icons.UPLOAD_FILE, on_click=do_import),
                     alignment=ft.Alignment.CENTER, bgcolor=ft.Colors.WHITE, height=60
                 )
             ],
@@ -527,8 +527,8 @@ async def main(page: ft.Page):
                     bgcolor=ft.Colors.WHITE, padding=15
                 ),
                 ft.Container(
-                    content=ft.Button("完成", bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE,
-                                      width=300, height=50, on_click=save),
+                    content=ft.Button(content=ft.Text("完成"), width=300, height=50, on_click=save,
+                                      style=ft.ButtonStyle(bgcolor=PRIMARY_COLOR, color=ft.Colors.WHITE)),
                     alignment=ft.Alignment.CENTER, margin=20
                 ),
                 ft.Container(
@@ -756,7 +756,7 @@ async def main(page: ft.Page):
                     ]),
                     padding=15, bgcolor=ft.Colors.WHITE,
                     border=ft.border.only(bottom=ft.BorderSide(1, ft.Colors.GREY_300)),
-                    animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT),
+                    animate=ft.Animation(duration=300, curve=ft.AnimationCurve.EASE_OUT),
                 )
 
                 def make_swipe(card):
