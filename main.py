@@ -208,9 +208,10 @@ async def main(page: ft.Page):
         "current_month": datetime.now().strftime("%Y-%m")
     }
 
-    file_picker_emp = ft.FilePicker()
-    file_picker_prod = ft.FilePicker()
-    page.services.extend([file_picker_emp, file_picker_prod])
+    # 【已修改】暂时移除 FilePicker 注册，避免 0.80+ 中 page.services 不存在导致启动崩溃
+    # file_picker_emp = ft.FilePicker()
+    # file_picker_prod = ft.FilePicker()
+    # page.services.extend([file_picker_emp, file_picker_prod])
 
     def snack(msg):
         page.show_dialog(ft.SnackBar(ft.Text(msg), duration=3000))
@@ -253,14 +254,15 @@ async def main(page: ft.Page):
                 )
             page.update()
 
-        async def do_import(e):
-            files = await file_picker_emp.pick_files(allowed_extensions=["csv"])
-            if not files:
-                return
-            success, msg = import_employees_csv(files[0].path)
-            snack(msg)
-            if success:
-                load_list()
+        # 【已修改】批量导入员工暂时禁用（依赖 FilePicker）
+        # async def do_import(e):
+        #     files = await file_picker_emp.pick_files(allowed_extensions=["csv"])
+        #     if not files:
+        #         return
+        #     success, msg = import_employees_csv(files[0].path)
+        #     snack(msg)
+        #     if success:
+        #         load_list()
 
         load_list()
 
@@ -279,8 +281,8 @@ async def main(page: ft.Page):
                 ),
                 emp_list,
                 ft.Container(
-                    content=ft.Button(content=ft.Text("批量导入员工 (CSV: 姓名,班组)"),
-                                      icon=ft.Icons.UPLOAD_FILE, on_click=do_import),
+                    content=ft.Button(content=ft.Text("批量导入员工 (暂时禁用)"),
+                                      icon=ft.Icons.UPLOAD_FILE, disabled=True),
                     alignment=ft.Alignment.CENTER, bgcolor=ft.Colors.WHITE, height=60
                 )
             ],
@@ -484,14 +486,15 @@ async def main(page: ft.Page):
                                    hint_text="请输入金额", border_width=0,
                                    keyboard_type=ft.KeyboardType.NUMBER)
 
-        async def do_import(e):
-            files = await file_picker_prod.pick_files(allowed_extensions=["csv"])
-            if not files:
-                return
-            success, msg = import_products_csv(files[0].path)
-            snack(msg)
-            if success:
-                go_back()
+        # 【已修改】批量导入暂时禁用（依赖 FilePicker）
+        # async def do_import(e):
+        #     files = await file_picker_prod.pick_files(allowed_extensions=["csv"])
+        #     if not files:
+        #         return
+        #     success, msg = import_products_csv(files[0].path)
+        #     snack(msg)
+        #     if success:
+        #         go_back()
 
         def save(ev):
             if not name_field.value or not price_field.value:
@@ -532,8 +535,8 @@ async def main(page: ft.Page):
                     alignment=ft.Alignment.CENTER, margin=20
                 ),
                 ft.Container(
-                    content=ft.TextButton("批量导入产品 (CSV: 产品名称,单价)", icon=ft.Icons.UPLOAD_FILE,
-                                          on_click=do_import),
+                    content=ft.TextButton("批量导入产品 (暂时禁用)", icon=ft.Icons.UPLOAD_FILE,
+                                          disabled=True),
                     alignment=ft.Alignment.CENTER
                 )
             ],
