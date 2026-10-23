@@ -224,10 +224,10 @@ def main(page: ft.Page):
     page.bgcolor = "#F4F6F8"
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # ===== 先初始化数据库，再添加任何界面 =====
+    # ===== 先初始化数据库 =====
     init_db()
 
-    # ===== 诊断：红字 + 蓝色DB路径 + 绿色TABS占位 =====
+    # ===== 诊断标记 =====
     page.add(ft.Text("PY-OK", color="red", size=30))
     page.add(ft.Text(f"DB: {DB_PATH}", color="blue", size=12))
     page.update()
@@ -1081,6 +1081,10 @@ def main(page: ft.Page):
         elevation=4
     )
 
+    # ===== 构造 tabs 之前的标记 =====
+    page.add(ft.Text("BEFORE-TABS", color="green", size=20))
+    page.update()
+
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=300,
@@ -1089,11 +1093,11 @@ def main(page: ft.Page):
             ft.Tab(text="汇总", icon=ft.icons.PIE_CHART, content=tab_stat),
             ft.Tab(text="明细", icon=ft.icons.FORMAT_LIST_BULLETED, content=tab_detail),
         ],
-        expand=1,
+        # expand=1,  ← 已去掉
     )
 
-    # 绿色 TABS 占位验证
-    page.add(ft.Text("TABS-OK", color="green", size=20))
+    # ===== 构造 tabs 之后的标记 =====
+    page.add(ft.Text("AFTER-TABS", color="orange", size=20))
     page.update()
 
     page.add(tabs)
