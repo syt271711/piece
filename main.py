@@ -256,14 +256,14 @@ def main(page: ft.Page):
         "qty": 0.0,
     }
 
-    # ---------- 日期选择器 ----------
+    # ---------- 日期选择器（不再放进 overlay，改用 page.open） ----------
     date_picker = ft.DatePicker(
         first_date=datetime(2020, 1, 1),
         last_date=datetime(2035, 12, 31),
         value=datetime.now(),
         on_change=lambda e: on_date_picked(e)
     )
-    page.overlay.append(date_picker)
+    # page.overlay.append(date_picker)  ← 已删除
 
     date_text = ft.Text(wizard["date"], size=15, weight=ft.FontWeight.BOLD, color=PRIMARY_COLOR)
 
@@ -274,8 +274,7 @@ def main(page: ft.Page):
             page.update()
 
     def open_date_picker(e):
-        date_picker.open = True
-        page.update()
+        page.open(date_picker)
 
     date_row = ft.Row([
         ft.Text("记账日期：", size=14, color=ft.colors.GREY_700),
@@ -1073,14 +1072,6 @@ def main(page: ft.Page):
         detail_list,
     ], expand=True)
 
-    # ==================== 主框架 ====================
-    page.appbar = ft.AppBar(
-        title=ft.Text("盛煜通计件工资系统", color=ft.colors.WHITE, weight=ft.FontWeight.BOLD),
-        bgcolor=PRIMARY_COLOR,
-        center_title=True,
-        elevation=4
-    )
-
     # ===== 构造 tabs 之前的标记 =====
     page.add(ft.Text("BEFORE-TABS", color="green", size=20))
     page.update()
@@ -1101,6 +1092,16 @@ def main(page: ft.Page):
     page.update()
 
     page.add(tabs)
+
+    # ===== appbar 移到 add(tabs) 之后 =====
+    page.appbar = ft.AppBar(
+        title=ft.Text("盛煜通计件工资系统", color=ft.colors.WHITE, weight=ft.FontWeight.BOLD),
+        bgcolor=PRIMARY_COLOR,
+        center_title=True,
+        elevation=4
+    )
+    page.update()
+
     refresh_step_indicator()
     refresh_stat()
 
